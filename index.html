@@ -453,25 +453,46 @@ function formatLogTime(v){
   return `${d.getFullYear()}/${p(d.getMonth()+1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
+// 同じ分・同じ品目・同じ操作・同じ更新者が連続している行は、1件にまとめて表示する
+// （同じ端末から短時間に続けて操作されたとみなせるため）。スプレッドシート側の履歴は全件そのまま残る。
+function groupLogEntries(list){
+  const groups = [];
+  list.forEach(entry=>{
+    const minuteKey = String(entry['日時'] || '').slice(0, 16);
+    const key = minuteKey + '|' + entry['品目名'] + '|' + entry['シート'] + '|' + entry['操作'] + '|' + (entry['更新者'] || '');
+    const last = groups[groups.length - 1];
+    if (last && last.key === key){
+      last.items.push(entry);
+    } else {
+      groups.push({key, items: [entry]});
+    }
+  });
+  return groups;
+}
+
 function renderLog(){
   const wrap = document.getElementById('logList');
   wrap.innerHTML = '';
-  let filtered = LOG.filter(x => matchesSearch(x, searchLog));
+  const filtered = LOG.filter(x => matchesSearch(x, searchLog));
   if (filtered.length === 0){
     wrap.innerHTML = '<div class="empty-msg">' + (LOG.length === 0 ? '更新履歴がまだありません。' : 'この品目名に一致する履歴はありません。') + '</div>';
     return;
   }
-  filtered.forEach(entry=>{
+  const groups = groupLogEntries(filtered);
+  groups.forEach(group=>{
+    const items = group.items;
+    const latest = items[0];
+    const earliest = items[items.length - 1];
     const row = document.createElement('div');
     row.className = 'log-row';
-    const before = entry['変更前'];
-    const after = entry['変更後'];
+    const before = earliest['変更前'];
+    const after = latest['変更後'];
     const hasChange = (before !== '' && before !== undefined) || (after !== '' && after !== undefined);
     row.innerHTML = `
-      <div class="log-time">${escapeHtml(formatLogTime(entry['日時']))}</div>
-      <div class="log-main">${escapeHtml(entry['品目名'] || '')}<span class="log-sheet">${escapeHtml(entry['シート'] || '')}・${escapeHtml(entry['操作'] || '')}</span></div>
+      <div class="log-time">${escapeHtml(formatLogTime(latest['日時']))}</div>
+      <div class="log-main">${escapeHtml(latest['品目名'] || '')}<span class="log-sheet">${escapeHtml(latest['シート'] || '')}・${escapeHtml(latest['操作'] || '')}</span></div>
       ${hasChange ? `<div class="log-change">${escapeHtml(String(before ?? ''))} → ${escapeHtml(String(after ?? ''))}</div>` : ''}
-      <div class="log-updater">更新者：${escapeHtml(entry['更新者'] || '（未記入）')}</div>
+      <div class="log-updater">更新者：${escapeHtml(latest['更新者'] || '（未記入）')}${items.length > 1 ? `（${items.length}回まとめて表示）` : ''}</div>
     `;
     wrap.appendChild(row);
   });
