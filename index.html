@@ -1,0 +1,1185 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>SANDBOXカフェ 在庫・仕込み管理</title>
+<style>
+:root{
+  --paper:#f5f2ea; --paper-raised:#ffffff; --ink:#1f2a24; --ink-soft:#4b5750; --ink-faint:#696f76;
+  --rule:#d8d3c4; --accent:#2E6B4C; --accent-soft:#e3ede7; --warn:#8a6d1f; --stop:#a3402f; --mark:#f4e6b8;
+  --car:#6b5416; --car-bg:#f4e6b8; --net:#2E6B4C; --net-bg:#e3ede7; --accent-ink:#ffffff;
+  --serif:"Hiragino Mincho ProN","Yu Mincho",serif; --sans:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#1b201d; --paper-raised:#242a26; --ink:#eef1ee; --ink-soft:#c7cfc9; --ink-faint:#93a098;
+    --rule:#3a423c; --accent:#7FBF98; --accent-soft:#26332c; --warn:#e0c26a; --stop:#e08a75; --mark:#3a3420;
+    --car:#e0c26a; --car-bg:#3a3420; --net:#7FBF98; --net-bg:#1f3329; --accent-ink:#12231a;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#1b201d; --paper-raised:#242a26; --ink:#eef1ee; --ink-soft:#c7cfc9; --ink-faint:#93a098;
+  --rule:#3a423c; --accent:#7FBF98; --accent-soft:#26332c; --warn:#e0c26a; --stop:#e08a75; --mark:#3a3420;
+  --car:#e0c26a; --car-bg:#3a3420; --net:#7FBF98; --net-bg:#1f3329; --accent-ink:#12231a;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--paper);color:var(--ink);font-family:var(--sans);
+  -webkit-text-size-adjust:100%;}
+body{padding-bottom:90px;}
+h1,h2,h3{font-family:var(--serif);margin:0;}
+.header{position:sticky;top:0;z-index:20;background:var(--paper);border-bottom:1px solid var(--rule);
+  padding:14px 16px 10px;}
+.header h1{font-size:19px;color:var(--ink);line-height:1.3;}
+.header .sub{font-size:12px;color:var(--ink-faint);margin-top:2px;}
+.staff-row{display:flex;align-items:center;gap:8px;margin-top:10px;}
+.staff-row label{font-size:12px;color:var(--ink-faint);font-weight:600;white-space:nowrap;
+  min-height:24px;display:flex;align-items:center;}
+.staff-row input{flex:1;min-width:0;min-height:34px;border:1px solid var(--rule);border-radius:8px;
+  background:var(--paper-raised);color:var(--ink);font-size:13px;padding:0 10px;}
+.tabs{display:flex;gap:6px;margin-top:12px;}
+.tab-btn{flex:1;padding:11px 4px;border:1px solid var(--rule);border-radius:8px;background:var(--paper-raised);
+  color:var(--ink-soft);font-size:14px;font-weight:600;text-align:center;min-height:44px;}
+.tab-btn.active{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);}
+.status-bar{padding:8px 16px;font-size:12px;color:var(--ink-faint);text-align:center;min-height:20px;}
+.last-sync{padding:0 16px 8px;font-size:11px;color:var(--ink-faint);text-align:center;}
+.status-bar.err{color:var(--stop);font-weight:600;}
+.status-bar.ok{color:var(--accent);}
+main{padding:12px 12px 40px;max-width:940px;margin:0 auto;}
+.panel{display:none;}
+.panel.active{display:block;}
+.subtabs{display:flex;gap:6px;margin-bottom:10px;}
+.subtab-btn{flex:1;padding:9px 4px;border:1px solid var(--rule);border-radius:8px;background:var(--paper-raised);
+  color:var(--ink-soft);font-size:13px;font-weight:600;text-align:center;min-height:38px;}
+.subtab-btn.active{background:var(--accent-soft);color:var(--accent);border-color:var(--accent);}
+.subpanel{display:none;}
+.subpanel.active{display:block;}
+.cat-group{margin-bottom:18px;}
+.cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px;}
+.cards-grid .item-card,.cards-grid .shop-item,.cards-grid .prep-card{margin-bottom:0;}
+.cat-title{font-size:13px;font-weight:700;color:var(--ink-soft);padding:4px 4px 8px;
+  border-bottom:1px solid var(--rule);margin-bottom:8px;}
+.item-card{background:var(--paper-raised);border:1px solid var(--rule);border-radius:10px;
+  padding:12px;margin-bottom:8px;}
+.item-name{font-size:15px;font-weight:600;line-height:1.4;}
+.item-note{font-size:12px;color:var(--ink-faint);margin-top:2px;}
+.badge{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;
+  margin-top:6px;}
+.badge.car{color:var(--car);background:var(--car-bg);}
+.badge.net{color:var(--net);background:var(--net-bg);}
+.item-top{display:flex;align-items:center;gap:10px;}
+.item-top .item-main{flex:1;min-width:0;}
+.item-top .cur-numstep{flex-shrink:0;width:116px;}
+.row-fields{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;}
+.field{flex:1;min-width:120px;}
+.field label{display:block;font-size:11px;color:var(--ink-faint);padding:5px 0;font-weight:600;min-height:24px;line-height:14px;}
+.field input[type="date"]{width:100%;min-height:38px;border:1px solid var(--rule);border-radius:8px;
+  background:var(--paper);color:var(--ink);font-size:14px;padding:0 10px;}
+.field select.reason-select{width:100%;min-height:38px;border:1px solid var(--rule);border-radius:8px;
+  background:var(--paper);color:var(--ink);font-size:14px;padding:0 10px;}
+.numstep{display:flex;align-items:stretch;border:1px solid var(--rule);border-radius:8px;overflow:hidden;
+  background:var(--paper);}
+.numstep button{width:38px;min-height:38px;border:none;background:var(--accent-soft);color:var(--accent);
+  font-size:18px;font-weight:700;touch-action:manipulation;}
+.numstep input{flex:1;min-width:0;border:none;text-align:center;font-size:16px;font-weight:700;
+  background:transparent;color:var(--ink);padding:0;min-height:38px;
+  -moz-appearance:textfield;}
+.numstep input::-webkit-outer-spin-button,.numstep input::-webkit-inner-spin-button{
+  -webkit-appearance:none;margin:0;}
+.need-flag{display:inline-block;margin-top:8px;font-size:12px;font-weight:700;padding:4px 10px;
+  border-radius:20px;}
+.need-flag.short{color:var(--stop);background:color-mix(in srgb, var(--stop) 15%, var(--paper-raised));}
+.need-flag.stop{color:var(--accent-ink);background:var(--stop);}
+.need-flag.ok{color:var(--accent);background:var(--accent-soft);}
+.need-flag.unset{color:var(--ink-soft);background:var(--rule);}
+.readonly-field .readonly-value{min-height:38px;display:flex;align-items:center;justify-content:center;
+  border:1px solid var(--rule);border-radius:8px;background:var(--rule);color:var(--ink-soft);
+  font-size:16px;font-weight:700;}
+.base-need-line{margin-top:2px;}
+.shop-item{background:var(--paper-raised);border:1px solid var(--rule);border-radius:10px;
+  padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:12px;}
+.shop-item.checked{opacity:.45;}
+.shop-check{width:26px;height:26px;flex-shrink:0;accent-color:var(--accent);}
+.shop-info{flex:1;min-width:0;}
+.shop-info .item-name{font-size:15px;}
+.shop-qty-wrap{flex-shrink:0;min-width:64px;text-align:right;}
+.shop-qty-label{font-size:11px;color:var(--ink-faint);font-weight:600;margin-bottom:2px;}
+.shop-qty{font-size:20px;font-weight:800;color:var(--stop);}
+.shop-item.checked .shop-qty{color:var(--ink-faint);}
+.section-note{font-size:12px;color:var(--ink-faint);padding:8px 4px 14px;line-height:1.6;}
+.empty-msg{text-align:center;color:var(--ink-faint);font-size:14px;padding:40px 20px;}
+.prep-card{background:var(--paper-raised);border:1px solid var(--rule);border-radius:10px;
+  padding:12px;margin-bottom:8px;}
+.prep-main{display:flex;align-items:center;gap:10px;flex:1;min-width:0;}
+.prep-photo{width:40px;height:40px;border-radius:8px;object-fit:cover;flex-shrink:0;border:1px solid var(--rule);}
+.prep-photo-empty{background:var(--paper);}
+.prep-photo-btn{flex-shrink:0;width:32px;height:32px;border:1px solid var(--rule);border-radius:8px;
+  background:var(--paper);color:var(--ink-soft);font-size:14px;line-height:1;}
+.panel-toolbar{display:flex;gap:8px;align-items:center;justify-content:flex-end;flex-wrap:wrap;margin-bottom:6px;}
+.cat-select{flex:1;max-width:220px;min-height:38px;border:1px solid var(--rule);border-radius:8px;
+  background:var(--paper-raised);color:var(--ink);font-size:13px;padding:0 8px;}
+.search-input{flex:1;min-width:140px;min-height:38px;border:1px solid var(--rule);border-radius:8px;
+  background:var(--paper-raised);color:var(--ink);font-size:13px;padding:0 10px;}
+.add-toggle-btn{min-height:38px;padding:0 14px;border:1px solid var(--accent);border-radius:8px;
+  background:var(--accent);color:var(--accent-ink);font-size:13px;font-weight:700;white-space:nowrap;}
+.add-form{background:var(--paper-raised);border:1px solid var(--accent);border-radius:10px;
+  padding:14px;margin-bottom:14px;display:none;}
+.add-form.open{display:block;}
+.add-form .form-row{margin-bottom:10px;}
+.add-form label{display:block;font-size:12px;color:var(--ink-soft);font-weight:600;margin-bottom:4px;}
+.add-form input[type="text"],.add-form select{width:100%;min-height:40px;border:1px solid var(--rule);
+  border-radius:8px;background:var(--paper);color:var(--ink);font-size:15px;padding:0 10px;}
+.add-form .method-toggle{display:flex;gap:8px;}
+.add-form .method-toggle label{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;
+  min-height:40px;border:1px solid var(--rule);border-radius:8px;background:var(--paper);
+  font-size:13px;font-weight:600;color:var(--ink-soft);margin-bottom:0;}
+.add-form .method-toggle input{width:auto;min-height:auto;accent-color:var(--accent);}
+.add-form .form-actions{display:flex;gap:8px;justify-content:flex-end;}
+.add-form .btn-submit{min-height:40px;padding:0 18px;border:1px solid var(--accent);border-radius:8px;
+  background:var(--accent);color:var(--accent-ink);font-size:14px;font-weight:700;}
+.add-form .btn-cancel{min-height:40px;padding:0 18px;border:1px solid var(--rule);border-radius:8px;
+  background:var(--paper);color:var(--ink-soft);font-size:14px;font-weight:600;}
+.del-btn{flex-shrink:0;width:32px;height:32px;border:1px solid var(--rule);border-radius:8px;
+  background:var(--paper);color:var(--stop);font-size:16px;line-height:1;}
+.edit-btn{flex-shrink:0;width:32px;height:32px;border:1px solid var(--rule);border-radius:8px;
+  background:var(--paper);color:var(--accent);font-size:14px;line-height:1;}
+.edit-inline{margin-top:10px;}
+.log-row{background:var(--paper-raised);border:1px solid var(--rule);border-radius:10px;
+  padding:10px 12px;margin-bottom:6px;}
+.log-time{font-size:11px;color:var(--ink-faint);}
+.log-main{font-size:14px;font-weight:600;margin-top:2px;}
+.log-sheet{font-size:11px;color:var(--ink-faint);font-weight:600;margin-left:6px;}
+.log-change{font-size:13px;color:var(--ink-soft);margin-top:3px;}
+.log-updater{font-size:12px;color:var(--ink-faint);margin-top:3px;}
+.footer-tip{padding:20px 16px 4px;font-size:11px;color:var(--ink-faint);line-height:1.7;text-align:center;}
+.toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--paper);
+  padding:9px 18px;border-radius:20px;font-size:13px;z-index:50;opacity:0;transition:opacity .25s;
+  pointer-events:none;max-width:88vw;text-align:center;}
+.toast.show{opacity:1;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>SANDBOXカフェ 在庫・仕込み管理</h1>
+  <div class="sub">スマホから在庫数・仕込み残数を入力できます</div>
+  <div class="staff-row">
+    <label for="staffName">担当者</label>
+    <input type="text" id="staffName" placeholder="お名前（未入力でも操作できます）">
+  </div>
+  <div class="tabs">
+    <div class="tab-btn active" data-tab="stock">在庫</div>
+    <div class="tab-btn" data-tab="prep">仕込み数</div>
+    <div class="tab-btn" data-tab="shop">買い出し</div>
+    <div class="tab-btn" data-tab="log">更新履歴</div>
+  </div>
+</div>
+<div id="statusBar" class="status-bar">読み込み中…</div>
+<div id="lastSync" class="last-sync"></div>
+
+<main>
+  <div class="panel active" id="panel-stock">
+    <div class="panel-toolbar">
+      <input type="text" id="stockSearch" class="search-input" placeholder="品目名で検索">
+      <select id="stockCatFilter" class="cat-select"></select>
+      <button type="button" id="stockAddToggle" class="add-toggle-btn">＋ 品目を追加</button>
+    </div>
+    <div class="add-form" id="stockAddForm">
+      <div class="form-row">
+        <label>品目名</label>
+        <input type="text" id="stockAddName" placeholder="例：ストロー">
+      </div>
+      <div class="form-row">
+        <label>カテゴリ</label>
+        <input type="text" id="stockAddCat" list="stockCatList" placeholder="例：その他（消耗品・備品）">
+        <datalist id="stockCatList"></datalist>
+      </div>
+      <div class="form-row">
+        <label>購入方法</label>
+        <div class="method-toggle">
+          <label><input type="radio" name="stockAddMethod" value="car" checked> 車で買い出し</label>
+          <label><input type="radio" name="stockAddMethod" value="net"> ネット注文</label>
+        </div>
+      </div>
+      <div class="form-row">
+        <label>備考（任意）</label>
+        <input type="text" id="stockAddNote" placeholder="任意">
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn-cancel" id="stockAddCancel">キャンセル</button>
+        <button type="button" class="btn-submit" id="stockAddSubmit">追加する</button>
+      </div>
+    </div>
+    <div class="section-note">
+      品目ごとに「今の在庫数」を数えて入力してください。買い出しに何個必要かは「買い出し」タブで確認できます。
+    </div>
+    <div id="stockList"></div>
+  </div>
+
+  <div class="panel" id="panel-shop">
+    <div class="subtabs">
+      <div class="subtab-btn active" data-subtab="need">買うべきものだけ</div>
+      <div class="subtab-btn" data-subtab="base">基準数を設定する</div>
+    </div>
+    <div class="subpanel active" id="subpanel-need">
+      <div class="panel-toolbar">
+        <input type="text" id="needSearch" class="search-input" placeholder="品目名で検索">
+        <select id="needCatFilter" class="cat-select"></select>
+      </div>
+      <div class="section-note">
+        「現在庫数」が「基準数」より少ない品目だけを表示します。買ったらチェックしてください（チェックは保存されず、次に開いたときはリセットされます）。基準数を決める・見直すときは「基準数を設定する」タブへ。
+      </div>
+      <div id="shopList"></div>
+    </div>
+    <div class="subpanel" id="subpanel-base">
+      <div class="panel-toolbar">
+        <input type="text" id="baseSearch" class="search-input" placeholder="品目名で検索">
+        <select id="baseCatFilter" class="cat-select"></select>
+        <button type="button" id="baseAddToggle" class="add-toggle-btn">＋ 品目を追加</button>
+      </div>
+      <div class="add-form" id="baseAddForm">
+        <div class="form-row">
+          <label>品目名</label>
+          <input type="text" id="baseAddName" placeholder="例：ストロー">
+        </div>
+        <div class="form-row">
+          <label>カテゴリ</label>
+          <input type="text" id="baseAddCat" list="stockCatList" placeholder="例：その他（消耗品・備品）">
+        </div>
+        <div class="form-row">
+          <label>購入方法</label>
+          <div class="method-toggle">
+            <label><input type="radio" name="baseAddMethod" value="car" checked> 車で買い出し</label>
+            <label><input type="radio" name="baseAddMethod" value="net"> ネット注文</label>
+          </div>
+        </div>
+        <div class="form-row">
+          <label>備考（任意）</label>
+          <input type="text" id="baseAddNote" placeholder="任意">
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn-cancel" id="baseAddCancel">キャンセル</button>
+          <button type="button" class="btn-submit" id="baseAddSubmit">追加する</button>
+        </div>
+      </div>
+      <div class="section-note">
+        品目ごとに「基準数（週1回の買い出しで持っておきたい数）」を設定してください。現在庫数はここでは変更できません（「在庫」タブで入力）。
+        ここで追加した品目は「在庫」タブにも反映されます。
+      </div>
+      <div id="baseList"></div>
+    </div>
+  </div>
+
+  <div class="panel" id="panel-prep">
+    <div class="panel-toolbar">
+      <input type="text" id="prepSearch" class="search-input" placeholder="品目名で検索">
+      <select id="prepCatFilter" class="cat-select"></select>
+      <button type="button" id="prepAddToggle" class="add-toggle-btn">＋ 品目を追加</button>
+    </div>
+    <div class="add-form" id="prepAddForm">
+      <div class="form-row">
+        <label>品目名</label>
+        <input type="text" id="prepAddName" placeholder="例：抹茶テリーヌ">
+      </div>
+      <div class="form-row">
+        <label>カテゴリ（任意）</label>
+        <input type="text" id="prepAddCat" list="prepCatList" placeholder="任意">
+        <datalist id="prepCatList"></datalist>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn-cancel" id="prepAddCancel">キャンセル</button>
+        <button type="button" class="btn-submit" id="prepAddSubmit">追加する</button>
+      </div>
+    </div>
+    <div class="section-note">
+      仕込んだ時点の数を入れておき、出るたびに－ボタンで減らしてください。残数はレジ横のタブレットからも同じ数字が見えます。
+    </div>
+    <div id="prepList"></div>
+  </div>
+
+  <div class="panel" id="panel-log">
+    <div class="panel-toolbar">
+      <input type="text" id="logSearch" class="search-input" placeholder="品目名で検索">
+      <button type="button" id="logReload" class="add-toggle-btn">更新</button>
+    </div>
+    <div class="section-note">
+      直近の変更を新しい順に表示します（最大100件）。誰が・いつ・何を変えたかをここで確認できます。
+    </div>
+    <div id="logList"></div>
+  </div>
+
+  <div class="footer-tip">
+    データはGoogleスプレッドシートに保存されます。複数の端末で同時に開いても同じ数字が反映されます（画面を開き直すと最新の値に更新されます）。
+  </div>
+</main>
+
+<div id="toast" class="toast"></div>
+
+<script>
+const API_URL = 'https://script.google.com/macros/s/AKfycby7cQQaIG5UC5o6oXZpJ0SpNkGk5Y-RPp2sa7BPeGXgfbLKkh8u9Jf21LFBvUnRwsRf/exec';
+
+let STOCK = [];
+let PREP = [];
+const checkedShop = {};
+let catFilterStock = '';
+let catFilterNeed = '';
+let catFilterBase = '';
+let catFilterPrep = '';
+let searchStock = '';
+let searchNeed = '';
+let searchBase = '';
+let searchPrep = '';
+let searchLog = '';
+let LOG = [];
+let logLoaded = false;
+
+function currentStaffName(){
+  try{ return (document.getElementById('staffName').value || '').trim(); }
+  catch(e){ return ''; }
+}
+
+function initStaffName(){
+  const input = document.getElementById('staffName');
+  try{
+    const saved = localStorage.getItem('staffName');
+    if (saved) input.value = saved;
+  }catch(e){}
+  input.addEventListener('input', ()=>{
+    try{ localStorage.setItem('staffName', input.value); }catch(e){}
+  });
+}
+
+function matchesSearch(item, term){
+  if (!term) return true;
+  return String(item['品目名'] || '').toLowerCase().includes(term.toLowerCase());
+}
+
+function setStatus(text, kind){
+  const el = document.getElementById('statusBar');
+  el.textContent = text;
+  el.className = 'status-bar' + (kind ? ' ' + kind : '');
+}
+
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(()=>t.classList.remove('show'), 1800);
+}
+
+function toNum(v){
+  if (v === '' || v === null || v === undefined) return null;
+  // 全角数字・全角マイナスを半角化
+  const s = String(v).replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0))
+                      .replace(/[－ー―]/g, '-').trim();
+  if (s === '') return null;
+  const n = Number(s);
+  return isNaN(n) ? null : n;
+}
+
+function fillSelectOptions(selectEl, categories, currentValue, allLabel){
+  const prev = currentValue !== undefined ? currentValue : selectEl.value;
+  selectEl.innerHTML = '<option value="">' + allLabel + '</option>' +
+    categories.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  if (categories.includes(prev)) selectEl.value = prev;
+}
+
+function refreshStockCatFilter(){
+  const cats = [...new Set(STOCK.map(x => x['カテゴリ'] || 'その他'))];
+  fillSelectOptions(document.getElementById('stockCatFilter'), cats, catFilterStock, 'すべてのカテゴリ');
+  fillSelectOptions(document.getElementById('needCatFilter'), cats, catFilterNeed, 'すべてのカテゴリ');
+  fillSelectOptions(document.getElementById('baseCatFilter'), cats, catFilterBase, 'すべてのカテゴリ');
+  const datalist = document.getElementById('stockCatList');
+  if (datalist) datalist.innerHTML = cats.map(c => `<option value="${escapeHtml(c)}">`).join('');
+}
+
+function refreshPrepCatFilter(){
+  const cats = [...new Set(PREP.map(x => x['カテゴリ'] || '未分類'))];
+  fillSelectOptions(document.getElementById('prepCatFilter'), cats, catFilterPrep, 'すべてのカテゴリ');
+  const datalist = document.getElementById('prepCatList');
+  if (datalist) datalist.innerHTML = cats.map(c => `<option value="${escapeHtml(c)}">`).join('');
+}
+
+async function loadAll(){
+  setStatus('読み込み中…');
+  try{
+    const res = await fetch(API_URL + '?api=data', {method:'GET'});
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || '不明なエラー');
+    STOCK = data.stock || [];
+    PREP = data.prep || [];
+    refreshStockCatFilter();
+    refreshPrepCatFilter();
+    renderStock();
+    renderShopNeed();
+    renderShopBase();
+    renderPrep();
+    setStatus('最新データを読み込みました', 'ok');
+    setTimeout(()=>setStatus(''), 2000);
+    updateLastSync();
+  }catch(err){
+    setStatus('読み込みに失敗しました。通信環境を確認して再読み込みしてください（' + err.message + '）', 'err');
+  }
+}
+
+function updateLastSync(){
+  const el = document.getElementById('lastSync');
+  const now = new Date();
+  const p = n => String(n).padStart(2,'0');
+  el.textContent = '最終同期：' + p(now.getHours()) + ':' + p(now.getMinutes());
+}
+
+async function loadLog(){
+  const wrap = document.getElementById('logList');
+  wrap.innerHTML = '<div class="empty-msg">読み込み中…</div>';
+  try{
+    const res = await fetch(API_URL + '?api=log&limit=100', {method:'GET'});
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || '不明なエラー');
+    LOG = data.log || [];
+    logLoaded = true;
+    renderLog();
+  }catch(err){
+    wrap.innerHTML = '<div class="empty-msg">履歴の読み込みに失敗しました（' + escapeHtml(err.message) + '）</div>';
+  }
+}
+
+function formatLogTime(v){
+  if (!v) return '';
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return String(v);
+  const p = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}/${p(d.getMonth()+1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+function renderLog(){
+  const wrap = document.getElementById('logList');
+  wrap.innerHTML = '';
+  let filtered = LOG.filter(x => matchesSearch(x, searchLog));
+  if (filtered.length === 0){
+    wrap.innerHTML = '<div class="empty-msg">' + (LOG.length === 0 ? '更新履歴がまだありません。' : 'この品目名に一致する履歴はありません。') + '</div>';
+    return;
+  }
+  filtered.forEach(entry=>{
+    const row = document.createElement('div');
+    row.className = 'log-row';
+    const before = entry['変更前'];
+    const after = entry['変更後'];
+    const hasChange = (before !== '' && before !== undefined) || (after !== '' && after !== undefined);
+    row.innerHTML = `
+      <div class="log-time">${escapeHtml(formatLogTime(entry['日時']))}</div>
+      <div class="log-main">${escapeHtml(entry['品目名'] || '')}<span class="log-sheet">${escapeHtml(entry['シート'] || '')}・${escapeHtml(entry['操作'] || '')}</span></div>
+      ${hasChange ? `<div class="log-change">${escapeHtml(String(before ?? ''))} → ${escapeHtml(String(after ?? ''))}</div>` : ''}
+      <div class="log-updater">更新者：${escapeHtml(entry['更新者'] || '（未記入）')}</div>
+    `;
+    wrap.appendChild(row);
+  });
+}
+
+async function postAction(body){
+  const payload = Object.assign({updater: currentStaffName()}, body);
+  const res = await fetch(API_URL, {
+    method:'POST',
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || '保存に失敗しました');
+  updateLastSync();
+  return data.result;
+}
+
+function expiryFlagHtml(dateStr){
+  if (!dateStr) return '';
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const exp = new Date(dateStr + 'T00:00:00');
+  if (isNaN(exp.getTime())) return '';
+  const diffDays = Math.round((exp - today) / 86400000);
+  if (diffDays < 0) return '<span class="need-flag short">期限切れ（' + escapeHtml(dateStr) + '）</span>';
+  if (diffDays === 0) return '<span class="need-flag short">本日が期限</span>';
+  if (diffDays <= 2) return '<span class="need-flag short">期限が近い（あと' + diffDays + '日）</span>';
+  return '<span class="need-flag ok">期限まであと' + diffDays + '日</span>';
+}
+
+function needFlagHtml(base, cur, unit){
+  if (cur <= 0) return '<span class="need-flag stop">在庫切れ</span>';
+  if (base === null) return '<span class="need-flag unset">基準数 未設定</span>';
+  const need = base - cur;
+  return need > 0
+    ? `<span class="need-flag short">残りわずか（買い出しで ${need}${escapeHtml(unit||'')} 必要）</span>`
+    : `<span class="need-flag ok">在庫で充足</span>`;
+}
+
+function groupByCat(list, catKey){
+  const map = new Map();
+  list.forEach(item=>{
+    const cat = item[catKey] || 'その他';
+    if (!map.has(cat)) map.set(cat, []);
+    map.get(cat).push(item);
+  });
+  return map;
+}
+
+function renderStock(){
+  const wrap = document.getElementById('stockList');
+  wrap.innerHTML = '';
+  let filtered = catFilterStock ? STOCK.filter(x => (x['カテゴリ']||'その他') === catFilterStock) : STOCK;
+  filtered = filtered.filter(x => matchesSearch(x, searchStock));
+  if (filtered.length === 0){
+    wrap.innerHTML = '<div class="empty-msg">このカテゴリの品目はありません。</div>';
+    return;
+  }
+  const groups = groupByCat(filtered, 'カテゴリ');
+  groups.forEach((items, cat)=>{
+    const g = document.createElement('div');
+    g.className = 'cat-group';
+    const t = document.createElement('div');
+    t.className = 'cat-title';
+    t.textContent = cat;
+    g.appendChild(t);
+    const grid = document.createElement('div');
+    grid.className = 'cards-grid';
+    items.forEach(item=>{
+      grid.appendChild(buildStockCard(item));
+    });
+    g.appendChild(grid);
+    wrap.appendChild(g);
+  });
+}
+
+function buildStockCard(item){
+  const card = document.createElement('div');
+  card.className = 'item-card';
+  const method = item['購入方法'] === '車' ? 'car' : 'net';
+  const methodLabel = item['購入方法'] === '車' ? '車で買い出し' : 'ネット注文';
+  const base = toNum(item['基準数(週次必要量)']);
+  const baseDisplay = base === null ? '未設定' : base + (item['単位']||'');
+
+  card.innerHTML = `
+    <div class="item-top">
+      <div class="item-main">
+        <div class="item-name">${escapeHtml(item['品目名'] || '')}</div>
+        ${item['備考'] ? `<div class="item-note">${escapeHtml(item['備考'])}</div>` : ''}
+        <span class="badge ${method}">${methodLabel}</span>
+      </div>
+      <button type="button" class="edit-btn" title="この品目を編集">✎</button>
+      <button type="button" class="del-btn" title="この品目を削除">×</button>
+    </div>
+    <div class="row-fields">
+      <div class="field">
+        <label>現在庫数</label>
+        <div class="numstep">
+          <button type="button" data-act="cur-dec">－</button>
+          <input type="text" inputmode="numeric" class="cur-input" value="${item['現在庫数'] ?? 0}">
+          <button type="button" data-act="cur-inc">＋</button>
+        </div>
+      </div>
+      <div class="field readonly-field">
+        <label>基準数（週次）</label>
+        <div class="readonly-value">${escapeHtml(baseDisplay)}</div>
+      </div>
+    </div>
+    <div class="row-fields">
+      <div class="field">
+        <label>変更理由（任意）</label>
+        <select class="reason-select">
+          <option value="">選択しない</option>
+          <option value="納品">納品</option>
+          <option value="使用">使用</option>
+          <option value="廃棄">廃棄</option>
+          <option value="棚卸し">棚卸し</option>
+        </select>
+      </div>
+    </div>
+    <div class="base-need-line"></div>
+    <div class="add-form edit-inline">
+      <div class="form-row">
+        <label>品目名</label>
+        <input type="text" class="edit-name" value="${escapeHtml(item['品目名'] || '')}">
+      </div>
+      <div class="form-row">
+        <label>カテゴリ</label>
+        <input type="text" class="edit-cat" list="stockCatList" value="${escapeHtml(item['カテゴリ'] || '')}">
+      </div>
+      <div class="form-row">
+        <label>購入方法</label>
+        <div class="method-toggle">
+          <label><input type="radio" name="editMethod${item._row}" class="edit-method" value="car" ${item['購入方法']==='車'?'checked':''}> 車で買い出し</label>
+          <label><input type="radio" name="editMethod${item._row}" class="edit-method" value="net" ${item['購入方法']!=='車'?'checked':''}> ネット注文</label>
+        </div>
+      </div>
+      <div class="form-row">
+        <label>備考（任意）</label>
+        <input type="text" class="edit-note" value="${escapeHtml(item['備考'] || '')}">
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn-cancel edit-cancel">キャンセル</button>
+        <button type="button" class="btn-submit edit-save">保存する</button>
+      </div>
+    </div>
+  `;
+
+  const curInput = card.querySelector('.cur-input');
+  const needLine = card.querySelector('.base-need-line');
+  const reasonSelect = card.querySelector('.reason-select');
+
+  function refreshStockNeedLine(){
+    const b = toNum(item['基準数(週次必要量)']);
+    const c = toNum(item['現在庫数']) || 0;
+    needLine.innerHTML = needFlagHtml(b, c, item['単位']);
+  }
+  refreshStockNeedLine();
+
+  function commitCur(){
+    let v = toNum(curInput.value);
+    if (v === null) v = 0;
+    if (v < 0) v = 0;
+    curInput.value = v;
+    item['現在庫数'] = v;
+    refreshStockNeedLine();
+    const reason = reasonSelect.value;
+    postAction({action:'updateStock', row:item._row, value:v, name:item['品目名'], reason})
+      .then(()=>{toast(item['品目名'] + 'の在庫数を保存しました'); renderShopNeed();})
+      .catch(e=>toast('保存失敗：' + e.message));
+  }
+
+  curInput.addEventListener('blur', commitCur);
+  curInput.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); curInput.blur(); }});
+
+  card.querySelector('[data-act="cur-inc"]').addEventListener('click', ()=>{
+    const v = (toNum(curInput.value) || 0) + 1; curInput.value = v; commitCur();
+  });
+  card.querySelector('[data-act="cur-dec"]').addEventListener('click', ()=>{
+    const v = Math.max(0, (toNum(curInput.value) || 0) - 1); curInput.value = v; commitCur();
+  });
+  card.querySelector('.del-btn').addEventListener('click', ()=>{
+    if (!confirm(item['品目名'] + 'を本当に削除しますか？（元に戻せません）')) return;
+    postAction({action:'deleteStock', row:item._row})
+      .then(()=>{
+        toast(item['品目名'] + 'を削除しました');
+        STOCK = STOCK.filter(x=>x !== item);
+        refreshStockCatFilter(); renderStock(); renderShopNeed(); renderShopBase();
+      })
+      .catch(e=>toast('削除失敗：' + e.message));
+  });
+
+  const editPanel = card.querySelector('.edit-inline');
+  card.querySelector('.edit-btn').addEventListener('click', ()=>{
+    editPanel.classList.toggle('open');
+  });
+  card.querySelector('.edit-cancel').addEventListener('click', ()=>{
+    editPanel.classList.remove('open');
+  });
+  card.querySelector('.edit-save').addEventListener('click', async ()=>{
+    const name = editPanel.querySelector('.edit-name').value.trim();
+    const category = editPanel.querySelector('.edit-cat').value.trim();
+    const note = editPanel.querySelector('.edit-note').value.trim();
+    const method = editPanel.querySelector('.edit-method:checked').value;
+    if (!name){ toast('品目名を入力してください'); return; }
+    try{
+      await postAction({action:'editStock', row:item._row, name, category, method, note});
+      item['品目名'] = name;
+      item['カテゴリ'] = category || 'その他';
+      item['購入方法'] = (method === 'car') ? '車' : 'ネット';
+      item['備考'] = note;
+      toast(name + 'を更新しました');
+      editPanel.classList.remove('open');
+      refreshStockCatFilter();
+      renderStock();
+      renderShopNeed();
+      renderShopBase();
+    }catch(e){
+      toast('更新失敗：' + e.message);
+    }
+  });
+
+  return card;
+}
+
+function renderShopNeed(){
+  const wrap = document.getElementById('shopList');
+  wrap.innerHTML = '';
+  let needed = STOCK.filter(item=>{
+    const base = toNum(item['基準数(週次必要量)']);
+    if (base === null) return false;
+    const cur = toNum(item['現在庫数']) || 0;
+    return base - cur > 0;
+  });
+  if (catFilterNeed){
+    needed = needed.filter(x => (x['カテゴリ']||'その他') === catFilterNeed);
+  }
+  needed = needed.filter(x => matchesSearch(x, searchNeed));
+
+  if (needed.length === 0){
+    const hasAnyBase = STOCK.some(item => toNum(item['基準数(週次必要量)']) !== null);
+    wrap.innerHTML = hasAnyBase
+      ? '<div class="empty-msg">今のところ買い足しが必要な品目はありません。</div>'
+      : '<div class="empty-msg">基準数がまだ設定されていません。「基準数を設定する」タブで各品目の基準数を入れると、ここに必要な購入数が自動で出ます。</div>';
+    return;
+  }
+
+  const groups = groupByCat(needed, 'カテゴリ');
+  groups.forEach((items, cat)=>{
+    const g = document.createElement('div');
+    g.className = 'cat-group';
+    const t = document.createElement('div');
+    t.className = 'cat-title';
+    t.textContent = cat;
+    g.appendChild(t);
+    const grid = document.createElement('div');
+    grid.className = 'cards-grid';
+    items.forEach(item=>{
+      const base = toNum(item['基準数(週次必要量)']);
+      const cur = toNum(item['現在庫数']) || 0;
+      const need = base - cur;
+      const key = 'row' + item._row;
+      const row = document.createElement('label');
+      row.className = 'shop-item' + (checkedShop[key] ? ' checked' : '');
+      row.innerHTML = `
+        <input type="checkbox" class="shop-check" ${checkedShop[key] ? 'checked' : ''}>
+        <div class="shop-info">
+          <div class="item-name">${escapeHtml(item['品目名'] || '')}</div>
+          ${item['備考'] ? `<div class="item-note">${escapeHtml(item['備考'])}</div>` : ''}
+          <span class="badge ${item['購入方法']==='車'?'car':'net'}">${item['購入方法']==='車'?'車で買い出し':'ネット注文'}</span>
+          ${cur <= 0 ? '<span class="need-flag stop">在庫切れ</span>' : ''}
+        </div>
+        <div class="shop-qty-wrap">
+          <div class="shop-qty-label">必要数</div>
+          <div class="shop-qty">${need}${escapeHtml(item['単位']||'')}</div>
+        </div>
+        <button type="button" class="del-btn" title="この品目を削除">×</button>
+      `;
+      row.querySelector('.shop-check').addEventListener('change', (e)=>{
+        checkedShop[key] = e.target.checked;
+        row.classList.toggle('checked', e.target.checked);
+      });
+      // labelの中にボタンを置くため、削除ボタンのクリックがチェックボックスのトグルへ
+      // 伝播しないようにする（伝播すると1回目のクリックがチェック操作に吸われ、
+      // 確認ダイアログが出たように見えず「反応しない」症状になる）
+      row.querySelector('.del-btn').addEventListener('click', (e)=>{
+        e.preventDefault();
+        e.stopPropagation();
+        if (!confirm(item['品目名'] + 'を本当に削除しますか？（元に戻せません）')) return;
+        postAction({action:'deleteStock', row:item._row})
+          .then(()=>{
+            toast(item['品目名'] + 'を削除しました');
+            STOCK = STOCK.filter(x=>x !== item);
+            refreshStockCatFilter(); renderStock(); renderShopNeed(); renderShopBase();
+          })
+          .catch(e=>toast('削除失敗：' + e.message));
+      });
+      grid.appendChild(row);
+    });
+    g.appendChild(grid);
+    wrap.appendChild(g);
+  });
+
+  const summary = document.createElement('div');
+  summary.className = 'section-note';
+  summary.textContent = `合計 ${needed.length} 品目が基準数を下回っています（週1回の買い出し基準）。`;
+  wrap.insertBefore(summary, wrap.firstChild);
+}
+
+function renderShopBase(){
+  const wrap = document.getElementById('baseList');
+  wrap.innerHTML = '';
+  let filtered = catFilterBase ? STOCK.filter(x => (x['カテゴリ']||'その他') === catFilterBase) : STOCK;
+  filtered = filtered.filter(x => matchesSearch(x, searchBase));
+  if (filtered.length === 0){
+    wrap.innerHTML = '<div class="empty-msg">このカテゴリの品目はありません。</div>';
+    return;
+  }
+  const groups = groupByCat(filtered, 'カテゴリ');
+  groups.forEach((items, cat)=>{
+    const g = document.createElement('div');
+    g.className = 'cat-group';
+    const t = document.createElement('div');
+    t.className = 'cat-title';
+    t.textContent = cat;
+    g.appendChild(t);
+    const grid = document.createElement('div');
+    grid.className = 'cards-grid';
+    items.forEach(item=>{
+      grid.appendChild(buildBaseCard(item));
+    });
+    g.appendChild(grid);
+    wrap.appendChild(g);
+  });
+}
+
+function buildBaseCard(item){
+  const card = document.createElement('div');
+  card.className = 'item-card';
+  const method = item['購入方法'] === '車' ? 'car' : 'net';
+  const methodLabel = item['購入方法'] === '車' ? '車で買い出し' : 'ネット注文';
+  const cur = toNum(item['現在庫数']) || 0;
+
+  card.innerHTML = `
+    <div class="item-top">
+      <div class="item-main">
+        <div class="item-name">${escapeHtml(item['品目名'] || '')}</div>
+        ${item['備考'] ? `<div class="item-note">${escapeHtml(item['備考'])}</div>` : ''}
+        <span class="badge ${method}">${methodLabel}</span>
+      </div>
+      <button type="button" class="del-btn" title="この品目を削除">×</button>
+    </div>
+    <div class="row-fields">
+      <div class="field">
+        <label>基準数（週次）</label>
+        <div class="numstep">
+          <button type="button" data-act="base-dec">－</button>
+          <input type="text" inputmode="numeric" class="base-input" value="${item['基準数(週次必要量)'] ?? ''}" placeholder="未設定">
+          <button type="button" data-act="base-inc">＋</button>
+        </div>
+      </div>
+      <div class="field readonly-field">
+        <label>現在庫数（在庫タブで入力）</label>
+        <div class="readonly-value">${cur}${escapeHtml(item['単位']||'')}</div>
+      </div>
+    </div>
+    <div class="base-need-line"></div>
+  `;
+
+  const baseInput = card.querySelector('.base-input');
+  const needLine = card.querySelector('.base-need-line');
+
+  function refreshNeedLine(){
+    const base = toNum(item['基準数(週次必要量)']);
+    const curNow = toNum(item['現在庫数']) || 0;
+    needLine.innerHTML = needFlagHtml(base, curNow, item['単位']);
+  }
+  refreshNeedLine();
+
+  function commitBase(){
+    const v = toNum(baseInput.value);
+    if (v === null){ baseInput.value = ''; item['基準数(週次必要量)'] = ''; refreshNeedLine(); return; }
+    baseInput.value = v;
+    item['基準数(週次必要量)'] = v;
+    refreshNeedLine();
+    postAction({action:'updateBase', row:item._row, value:v, name:item['品目名']})
+      .then(()=>{toast(item['品目名'] + 'の基準数を保存しました'); renderShopNeed();})
+      .catch(e=>toast('保存失敗：' + e.message));
+  }
+
+  baseInput.addEventListener('blur', commitBase);
+  baseInput.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); baseInput.blur(); }});
+  card.querySelector('[data-act="base-inc"]').addEventListener('click', ()=>{
+    const v = (toNum(baseInput.value) || 0) + 1; baseInput.value = v; commitBase();
+  });
+  card.querySelector('[data-act="base-dec"]').addEventListener('click', ()=>{
+    const v = Math.max(0, (toNum(baseInput.value) || 0) - 1); baseInput.value = v; commitBase();
+  });
+  card.querySelector('.del-btn').addEventListener('click', ()=>{
+    if (!confirm(item['品目名'] + 'を本当に削除しますか？（元に戻せません）')) return;
+    postAction({action:'deleteStock', row:item._row})
+      .then(()=>{
+        toast(item['品目名'] + 'を削除しました');
+        STOCK = STOCK.filter(x=>x !== item);
+        refreshStockCatFilter(); renderStock(); renderShopNeed(); renderShopBase();
+      })
+      .catch(e=>toast('削除失敗：' + e.message));
+  });
+
+  return card;
+}
+
+function renderPrep(){
+  const wrap = document.getElementById('prepList');
+  wrap.innerHTML = '';
+  if (PREP.length === 0){
+    wrap.innerHTML = '<div class="empty-msg">仕込み品目がまだ登録されていません。</div>';
+    return;
+  }
+  let filtered = catFilterPrep ? PREP.filter(x => (x['カテゴリ']||'未分類') === catFilterPrep) : PREP;
+  filtered = filtered.filter(x => matchesSearch(x, searchPrep));
+  if (filtered.length === 0){
+    wrap.innerHTML = '<div class="empty-msg">このカテゴリの仕込み品目はありません。</div>';
+    return;
+  }
+  const groups = groupByCatPrep(filtered);
+  groups.forEach((items, cat)=>{
+    const g = document.createElement('div');
+    g.className = 'cat-group';
+    const t = document.createElement('div');
+    t.className = 'cat-title';
+    t.textContent = cat;
+    g.appendChild(t);
+    const grid = document.createElement('div');
+    grid.className = 'cards-grid';
+    items.forEach(item=>{
+      grid.appendChild(buildPrepCard(item));
+    });
+    g.appendChild(grid);
+    wrap.appendChild(g);
+  });
+}
+
+function groupByCatPrep(list){
+  const map = new Map();
+  list.forEach(item=>{
+    const cat = item['カテゴリ'] || '未分類';
+    if (!map.has(cat)) map.set(cat, []);
+    map.get(cat).push(item);
+  });
+  return map;
+}
+
+function buildPrepCard(item){
+  const card = document.createElement('div');
+  card.className = 'prep-card';
+  const photoUrl = item['写真URL'] || '';
+  const photoHtml = photoUrl
+    ? `<img class="prep-photo" src="${escapeHtml(photoUrl)}" alt="">`
+    : `<div class="prep-photo prep-photo-empty"></div>`;
+  card.innerHTML = `
+    <div class="item-top">
+      <div class="item-main prep-main">
+        ${photoHtml}
+        <div class="item-name">${escapeHtml(item['品目名'] || '')}</div>
+      </div>
+      <button type="button" class="prep-photo-btn" title="写真を追加・変更">📷</button>
+      <button type="button" class="del-btn" title="この品目を削除">×</button>
+    </div>
+    <input type="file" class="prep-photo-input" accept="image/*" capture="environment" style="display:none;">
+    <div class="row-fields">
+      <div class="field">
+        <label>仕込み残数</label>
+        <div class="numstep">
+          <button type="button" data-act="dec">－</button>
+          <input type="text" inputmode="numeric" class="prep-input" value="${item['仕込み残数'] ?? 0}">
+          <button type="button" data-act="inc">＋</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>消費期限（任意）</label>
+        <input type="date" class="prep-expiry-input" value="${escapeHtml(item['消費期限'] || '')}">
+      </div>
+    </div>
+    <div class="prep-expiry-line"></div>
+  `;
+  const input = card.querySelector('.prep-input');
+  const expiryInput = card.querySelector('.prep-expiry-input');
+  const expiryLine = card.querySelector('.prep-expiry-line');
+
+  function refreshExpiryLine(){
+    expiryLine.innerHTML = expiryFlagHtml(item['消費期限']);
+  }
+  refreshExpiryLine();
+
+  expiryInput.addEventListener('change', ()=>{
+    const v = expiryInput.value;
+    item['消費期限'] = v;
+    refreshExpiryLine();
+    postAction({action:'prepExpiry', row:item._row, value:v, name:item['品目名']})
+      .then(()=>toast(item['品目名'] + 'の消費期限を保存しました'))
+      .catch(e=>toast('保存失敗：' + e.message));
+  });
+
+  const photoBtn = card.querySelector('.prep-photo-btn');
+  const photoInput = card.querySelector('.prep-photo-input');
+  photoBtn.addEventListener('click', ()=> photoInput.click());
+  photoInput.addEventListener('change', async ()=>{
+    const file = photoInput.files && photoInput.files[0];
+    if (!file) return;
+    try{
+      const photoBase64 = await fileToBase64(file);
+      const result = await postAction({action:'prepPhoto', row:item._row, name:item['品目名'], photoBase64});
+      item['写真URL'] = result.photoUrl;
+      toast(item['品目名'] + 'の写真を更新しました');
+      renderPrep();
+    }catch(e){
+      toast('写真の保存に失敗：' + e.message);
+    }
+  });
+
+  function commit(v){
+    v = Math.max(0, v);
+    input.value = v;
+    item['仕込み残数'] = v;
+    postAction({action:'prepSet', row:item._row, value:v, name:item['品目名']})
+      .then(()=>toast(item['品目名'] + 'の残数を' + v + 'に更新'))
+      .catch(e=>toast('保存失敗：' + e.message));
+  }
+
+  card.querySelector('[data-act="inc"]').addEventListener('click', ()=>{
+    commit((toNum(input.value) || 0) + 1);
+  });
+  card.querySelector('[data-act="dec"]').addEventListener('click', ()=>{
+    commit((toNum(input.value) || 0) - 1);
+  });
+  input.addEventListener('blur', ()=>{
+    const v = toNum(input.value);
+    commit(v === null ? 0 : v);
+  });
+  input.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); input.blur(); }});
+  card.querySelector('.del-btn').addEventListener('click', ()=>{
+    if (!confirm(item['品目名'] + 'を本当に削除しますか？（元に戻せません）')) return;
+    postAction({action:'deletePrep', row:item._row})
+      .then(()=>{
+        toast(item['品目名'] + 'を削除しました');
+        PREP = PREP.filter(x=>x !== item);
+        refreshPrepCatFilter();
+        renderPrep();
+      })
+      .catch(e=>toast('削除失敗：' + e.message));
+  });
+
+  return card;
+}
+
+function fileToBase64(file){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=>resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+    if (btn.dataset.tab === 'log' && !logLoaded) loadLog();
+  });
+});
+
+document.querySelectorAll('.subtab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.subtab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.subpanel').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('subpanel-' + btn.dataset.subtab).classList.add('active');
+  });
+});
+
+// ===== カテゴリ選択フィルタ =====
+document.getElementById('stockCatFilter').addEventListener('change', e=>{
+  catFilterStock = e.target.value; renderStock();
+});
+document.getElementById('needCatFilter').addEventListener('change', e=>{
+  catFilterNeed = e.target.value; renderShopNeed();
+});
+document.getElementById('baseCatFilter').addEventListener('change', e=>{
+  catFilterBase = e.target.value; renderShopBase();
+});
+document.getElementById('prepCatFilter').addEventListener('change', e=>{
+  catFilterPrep = e.target.value; renderPrep();
+});
+
+// ===== 品目名での検索 =====
+document.getElementById('stockSearch').addEventListener('input', e=>{
+  searchStock = e.target.value; renderStock();
+});
+document.getElementById('needSearch').addEventListener('input', e=>{
+  searchNeed = e.target.value; renderShopNeed();
+});
+document.getElementById('baseSearch').addEventListener('input', e=>{
+  searchBase = e.target.value; renderShopBase();
+});
+document.getElementById('prepSearch').addEventListener('input', e=>{
+  searchPrep = e.target.value; renderPrep();
+});
+document.getElementById('logSearch').addEventListener('input', e=>{
+  searchLog = e.target.value; renderLog();
+});
+document.getElementById('logReload').addEventListener('click', ()=>{ loadLog(); });
+
+// ===== 在庫：品目を追加するフォーム =====
+const stockAddForm = document.getElementById('stockAddForm');
+document.getElementById('stockAddToggle').addEventListener('click', ()=>{
+  stockAddForm.classList.toggle('open');
+});
+document.getElementById('stockAddCancel').addEventListener('click', ()=>{
+  stockAddForm.classList.remove('open');
+  document.getElementById('stockAddName').value = '';
+  document.getElementById('stockAddCat').value = '';
+  document.getElementById('stockAddNote').value = '';
+});
+document.getElementById('stockAddSubmit').addEventListener('click', async ()=>{
+  const name = document.getElementById('stockAddName').value.trim();
+  const category = document.getElementById('stockAddCat').value.trim();
+  const note = document.getElementById('stockAddNote').value.trim();
+  const method = document.querySelector('input[name="stockAddMethod"]:checked').value;
+  if (!name){ toast('品目名を入力してください'); return; }
+  try{
+    await postAction({action:'addStock', name, category, method, note});
+    toast(name + 'を追加しました');
+    document.getElementById('stockAddName').value = '';
+    document.getElementById('stockAddCat').value = '';
+    document.getElementById('stockAddNote').value = '';
+    stockAddForm.classList.remove('open');
+    await loadAll();
+  }catch(e){
+    toast('追加失敗：' + e.message);
+  }
+});
+
+// ===== 買い出し（基準数を設定する）：品目を追加するフォーム（在庫タブと同じデータに追加される） =====
+const baseAddForm = document.getElementById('baseAddForm');
+document.getElementById('baseAddToggle').addEventListener('click', ()=>{
+  baseAddForm.classList.toggle('open');
+});
+document.getElementById('baseAddCancel').addEventListener('click', ()=>{
+  baseAddForm.classList.remove('open');
+  document.getElementById('baseAddName').value = '';
+  document.getElementById('baseAddCat').value = '';
+  document.getElementById('baseAddNote').value = '';
+});
+document.getElementById('baseAddSubmit').addEventListener('click', async ()=>{
+  const name = document.getElementById('baseAddName').value.trim();
+  const category = document.getElementById('baseAddCat').value.trim();
+  const note = document.getElementById('baseAddNote').value.trim();
+  const method = document.querySelector('input[name="baseAddMethod"]:checked').value;
+  if (!name){ toast('品目名を入力してください'); return; }
+  try{
+    await postAction({action:'addStock', name, category, method, note});
+    toast(name + 'を追加しました（在庫タブにも反映されます）');
+    document.getElementById('baseAddName').value = '';
+    document.getElementById('baseAddCat').value = '';
+    document.getElementById('baseAddNote').value = '';
+    baseAddForm.classList.remove('open');
+    await loadAll();
+  }catch(e){
+    toast('追加失敗：' + e.message);
+  }
+});
+
+// ===== 仕込み：品目を追加するフォーム =====
+const prepAddForm = document.getElementById('prepAddForm');
+document.getElementById('prepAddToggle').addEventListener('click', ()=>{
+  prepAddForm.classList.toggle('open');
+});
+document.getElementById('prepAddCancel').addEventListener('click', ()=>{
+  prepAddForm.classList.remove('open');
+  document.getElementById('prepAddName').value = '';
+  document.getElementById('prepAddCat').value = '';
+});
+document.getElementById('prepAddSubmit').addEventListener('click', async ()=>{
+  const name = document.getElementById('prepAddName').value.trim();
+  const category = document.getElementById('prepAddCat').value.trim();
+  if (!name){ toast('品目名を入力してください'); return; }
+  try{
+    await postAction({action:'prepAdd', name, category, qty:0});
+    toast(name + 'を追加しました');
+    document.getElementById('prepAddName').value = '';
+    document.getElementById('prepAddCat').value = '';
+    prepAddForm.classList.remove('open');
+    await loadAll();
+  }catch(e){
+    toast('追加失敗：' + e.message);
+  }
+});
+
+initStaffName();
+loadAll();
+</script>
+</body>
+</html>
