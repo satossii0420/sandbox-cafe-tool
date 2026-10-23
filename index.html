@@ -318,6 +318,25 @@ main{padding:12px 12px 40px;max-width:940px;margin:0 auto;}
 <script>
 const API_URL = 'https://script.google.com/macros/s/AKfycby7cQQaIG5UC5o6oXZpJ0SpNkGk5Y-RPp2sa7BPeGXgfbLKkh8u9Jf21LFBvUnRwsRf/exec';
 
+// ===== 合言葉（スタッフ用）=====
+// 合言葉はこのファイル（公開リポジトリ）には書かない。各端末で1回だけ入力し、その端末に保存する。
+const TOKEN_KEY = 'cafeToken';
+let TOKEN_MEM = '';
+function getToken(){
+  try{ return localStorage.getItem(TOKEN_KEY) || TOKEN_MEM; }
+  catch(e){ return TOKEN_MEM; }
+}
+function setToken(v){
+  TOKEN_MEM = v;
+  try{ if (v) localStorage.setItem(TOKEN_KEY, v); else localStorage.removeItem(TOKEN_KEY); }
+  catch(e){}
+}
+function askToken(){
+  const v = window.prompt('スタッフ用の合言葉を入力してください（この端末に保存されます）');
+  if (v && v.trim()){ setToken(v.trim()); return true; }
+  return false;
+}
+
 let STOCK = [];
 let PREP = [];
 const checkedShop = {};
@@ -401,11 +420,21 @@ function refreshPrepCatFilter(){
   if (datalist) datalist.innerHTML = cats.map(c => `<option value="${escapeHtml(c)}">`).join('');
 }
 
-async function loadAll(){
+async function loadAll(retried){
   setStatus('読み込み中…');
   try{
-    const res = await fetch(API_URL + '?api=data', {method:'GET'});
+    if (!getToken() && !askToken()){
+      setStatus('合言葉が未入力です。画面を再読み込みして入力してください', 'err');
+      return;
+    }
+    const res = await fetch(API_URL + '?api=data&t=' + encodeURIComponent(getToken()), {method:'GET'});
     const data = await res.json();
+    if (data.auth === false){
+      setToken('');
+      if (!retried && askToken()) return loadAll(true);
+      setStatus('合言葉が違います。画面を再読み込みして入力し直してください', 'err');
+      return;
+    }
     if (!data.ok) throw new Error(data.error || '不明なエラー');
     STOCK = data.stock || [];
     PREP = data.prep || [];
@@ -434,8 +463,9 @@ async function loadLog(){
   const wrap = document.getElementById('logList');
   wrap.innerHTML = '<div class="empty-msg">読み込み中…</div>';
   try{
-    const res = await fetch(API_URL + '?api=log&limit=100', {method:'GET'});
+    const res = await fetch(API_URL + '?api=log&limit=100&t=' + encodeURIComponent(getToken()), {method:'GET'});
     const data = await res.json();
+    if (data.auth === false){ setToken(''); throw new Error('合言葉が違います。画面を再読み込みして入力し直してください'); }
     if (!data.ok) throw new Error(data.error || '不明なエラー');
     LOG = data.log || [];
     logLoaded = true;
@@ -499,12 +529,13 @@ function renderLog(){
 }
 
 async function postAction(body){
-  const payload = Object.assign({updater: currentStaffName()}, body);
+  const payload = Object.assign({updater: currentStaffName(), token: getToken()}, body);
   const res = await fetch(API_URL, {
     method:'POST',
     body: JSON.stringify(payload)
   });
   const data = await res.json();
+  if (data.auth === false){ setToken(''); throw new Error('合言葉が違います。画面を再読み込みして入力し直してください'); }
   if (!data.ok) throw new Error(data.error || '保存に失敗しました');
   updateLastSync();
   return data.result;
